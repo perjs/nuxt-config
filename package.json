@@ -1,0 +1,9 @@
+{
+  "name": "@perjs/nuxt-config",
+  "version": "0.0.1",
+  "main": "index.ts",
+  "license": "MIT",
+  "dependencies": {
+    "config": "^3.3.6"
+  }
+}
