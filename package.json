@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "index.ts",
   "license": "MIT",
+  "private": false,
   "devDependencies": {
     "config": "^3.3.6"
   }
