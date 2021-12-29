@@ -1,7 +1,7 @@
-import fs from 'fs'
+import { defineNuxtModule } from '@nuxt/kit'
+import { promises as fs } from 'fs'
 import path from 'path'
-import configFile from 'config'
-import { Module } from '@nuxt/types'
+import consola from 'consola'
 
 export interface ConfigModuleOptions {
   isBuildVersionEnabled: boolean
@@ -9,53 +9,41 @@ export interface ConfigModuleOptions {
 }
 
 const defaultOptions: ConfigModuleOptions = {
-  isBuildVersionEnabled: true,
-  isCacheVersionEnabled: true
+  isBuildVersionEnabled: false,
+  isCacheVersionEnabled: true,
 }
 
-const configModule: Module = function (localOptions?: ConfigModuleOptions) {
-  const {
-    extendBuild,
-    options: nuxtOptions
-  } = this
-
-  const options: ConfigModuleOptions = {
-    ...defaultOptions,
-    ...(nuxtOptions.config || {}),
-    ...(localOptions || {})
-  }
-
-  const { isBuildVersionEnabled, isCacheVersionEnabled } = options
-
-  extendBuild(function (config: any, _ctx) {
-    // @ts-ignore
-    const { buildDir } = this.buildContext.options
-
-    if (isCacheVersionEnabled) {
+export default defineNuxtModule({
+  hooks: {
+    async 'vite:extend'({ nuxt, config }) {
+      const start = new Date().getTime()
+      const configFileContent = require('config')
       try {
-        if (!configFile.server) {
-          configFile.server = {
-            cache: {
-              version: null
-            }
-          }
-        }
-        configFile.server.cache.version = fs.readFileSync(path.resolve(nuxtOptions.rootDir, '.cache-version'), 'utf8').replace('\n', '')
+        const cacheVersion = await fs.readFile(path.resolve(nuxt.options.srcDir, '.cache'), 'utf8') || ''
+        configFileContent.server.cache.version = cacheVersion.replace('\n', '')
+        consola.info('Cache version: ' + configFileContent.server.cache.version)
       } catch (e) {
-        console.log(e)
+        consola.error('Cache version file not found. Add some function to create .cache file in your root directory or create it manually.')
       }
+      await fs.writeFile(path.resolve(nuxt.options.buildDir, 'config.json'), JSON.stringify(configFileContent))
+      nuxt.options.alias.config = path.resolve(nuxt.options.buildDir, 'config.json')
+      config.resolve.alias.config = path.resolve(nuxt.options.buildDir, 'config.json')
+      consola.info(`Config file created in ${new Date().getTime() - start}ms`)
+    },
+  },
+  async setup(options, nuxt) {
+    options = {
+      ...defaultOptions,
+      ...options,
     }
 
-    fs.writeFileSync(path.resolve(buildDir, 'config.json'), JSON.stringify(configFile))
-    config.resolve.alias.config = path.resolve(buildDir, 'config.json')
+    const { isBuildVersionEnabled } = options
 
-    if (isBuildVersionEnabled) {
-      fs.writeFileSync(path.resolve(nuxtOptions.rootDir, 'static/build-version.json'), JSON.stringify({
+    if(isBuildVersionEnabled) {
+      fs.writeFile(path.resolve(nuxt.options.rootDir, 'public/build-version.json'), JSON.stringify({
         version: Math.random().toString(36).substring(7),
         date: new Date().toISOString()
       }))
     }
-  })
-}
-
-export default configModule
+  },
+})
